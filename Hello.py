@@ -9,7 +9,7 @@ article_text=st.text_input('Введите текст и нажмите Enter')
 
 model_name = "csebuetnlp/mT5_multilingual_XLSum"
 tokenizer = AutoTokenizer.from_pretrained(model_name,use_fast=False)
-model = AutoModelForSeq2SeqLM.from_pretrained(model_name,use_fast=False)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
 input_ids = tokenizer(
     [WHITESPACE_HANDLER(article_text)],
