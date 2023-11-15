@@ -4,7 +4,6 @@ pandas
 pydeck
 streamlit
 transformers
-torch
 tokenizers
 altair==5.1.2
 asttokens==2.4.1
