@@ -8,3 +8,4 @@ tokenizers
 torch 
 torchvision 
 torchaudio
+SentencePiece 
