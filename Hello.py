@@ -1,51 +1,57 @@
-# Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+import re
 
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoProcessor, AutoModel
 import streamlit as st
-from streamlit.logger import get_logger
+WHITESPACE_HANDLER = lambda k: re.sub('\s+', ' ', re.sub('\n+', ' ', k.strip()))
+st.title("Сокращение текста и прослушивание результата")
+article_text=st.text_input('Введите текст и нажмите Enter')
+#article_text = """Videos that say approved vaccines are dangerous and cause autism, cancer or infertility are among those that will be taken down, the company said.  The policy includes the termination of accounts of anti-vaccine influencers.  Tech giants have been criticised for not doing more to counter false health information on their sites.  In July, US President Joe Biden said social media platforms were largely responsible for people's scepticism in getting vaccinated by spreading misinformation, and appealed for them to address the issue.  YouTube, which is owned by Google, said 130,000 videos were removed from its platform since last year, when it implemented a ban on content spreading misinformation about Covid vaccines.  In a blog post, the company said it had seen false claims about Covid jabs "spill over into misinformation about vaccines in general". The new policy covers long-approved vaccines, such as those against measles or hepatitis B.  "We're expanding our medical misinformation policies on YouTube with new guidelines on currently administered vaccines that are approved and confirmed to be safe and effective by local health authorities and the WHO," the post said, referring to the World Health Organization."""
 
-LOGGER = get_logger(__name__)
+model_name = "csebuetnlp/mT5_multilingual_XLSum"
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 
+input_ids = tokenizer(
+    [WHITESPACE_HANDLER(article_text)],
+    return_tensors="pt",
+    padding="max_length",
+    truncation=True,
+    max_length=512
+)["input_ids"]
 
-def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+output_ids = model.generate(
+    input_ids=input_ids,
+    max_length=84,
+    no_repeat_ngram_size=2,
+    num_beams=4
+)[0]
 
-    st.write("# Welcome to Streamlit! 👋")
+summary = tokenizer.decode(
+    output_ids,
+    skip_special_tokens=True,
+    clean_up_tokenization_spaces=False
+)
+st.text(summary)
+st.title("Аудио")
+#print(summary)
 
-    st.sidebar.success("Select a demo above.")
+processor = AutoProcessor.from_pretrained("suno/bark-small")
+model = AutoModel.from_pretrained("suno/bark-small")
 
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
+inputs = processor(
+    text=summary,
+    return_tensors="pt",
+)
 
+speech_values = model.generate(**inputs, do_sample=True)
 
-if __name__ == "__main__":
-    run()
+sampling_rate = model.generation_config.sample_rate
+
+if speech_values is not None and len(speech_values) > 0:
+    sampling_rate = model.generation_config.sample_rate
+    st.audio(speech_values.cpu().numpy().squeeze(), format="audio/wav", start_time=0, sample_rate=sampling_rate)
+else:
+    st.warning("No audio generated.")
+
+#st.audio(Audio(speech_values.cpu().numpy().squeeze(), rate=sampling_rate))
+#Audio(speech_values.cpu().numpy().squeeze(), rate=sampling_rate)
